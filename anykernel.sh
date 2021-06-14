@@ -13,7 +13,6 @@ do.cleanuponabort=0
 device.name1=olive
 device.name2=olivelite
 device.name3=olivewood
-device.name4=pine
 supported.versions=
 supported.patchlevels=
 '; } # end properties
