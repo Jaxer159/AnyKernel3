@@ -1,0 +1,10 @@
+ on property:sys.boot_completed=1
+
+   # LOLZ boot script
+    write /sys/class/kgsl/kgsl-3d0/devfreq/min_freq 320000000
+    write /sys/class/kgsl/kgsl-3d0/max_gpuclk 560000000
+ 
+    # Restart IRQ balancer after boot complete
+    stop vendor.msm_irqbalance;
+    start vendor.msm_irqbalance;
+
