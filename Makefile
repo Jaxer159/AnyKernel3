@@ -2,7 +2,7 @@ NAME ?= Dragonfire-Kernel
 
 DATE := $(shell date "+%Y%m%d-%H%M")
 
-CODE := sdm439
+CODE := olives
 
 ZIP := $(NAME)-$(CODE)-$(DATE).zip
 
