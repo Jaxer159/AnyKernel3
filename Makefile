@@ -1,4 +1,4 @@
-NAME ?= Dragonfire-Kernel
+NAME ?= DragonFire-Kernel
 
 DATE := $(shell date "+%Y%m%d-%H%M")
 
