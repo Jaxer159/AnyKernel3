@@ -1,6 +1,6 @@
 NAME ?= DragonFire-Kernel
 
-DATE := $(shell date "+%Y%m%d-%H%M")
+VER := 3.1
 
 CODE := olives
 
