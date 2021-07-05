@@ -4,7 +4,7 @@ VER := 3.1
 
 CODE := olives
 
-ZIP := $(NAME)-$(CODE)-$(DATE).zip
+ZIP := $(NAME)-$(CODE)-$(VER).zip
 
 EXCLUDE := Makefile *.git* *.jar* *placeholder* *.md*
 
