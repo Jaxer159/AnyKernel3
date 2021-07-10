@@ -4,7 +4,7 @@
 ## AnyKernel setup
 # begin properties
 properties() { '
-kernel.string=Dragonfire Kernel by Jaxer159
+kernel.string=DragonFire Kernel by Jaxer159
 do.devicecheck=1
 do.modules=1
 do.systemless=0
