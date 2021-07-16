@@ -1,6 +1,6 @@
 NAME ?= DragonFire-Kernel
 
-VER := 3.1.1
+VER := 3.2
 
 CODE := olives
 
