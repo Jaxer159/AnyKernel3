@@ -4,7 +4,7 @@
 OUTFD=$1;
 
 # set up working directory variables
-[ "$home" ] || home=$PWD;
+test "$home" || home=$PWD;
 bootimg=$home/boot.img;
 bin=$home/tools;
 patch=$home/patch;
@@ -15,7 +15,7 @@ split_img=$home/split_img;
 # ui_print "<text>" [...]
 ui_print() {
   until [ ! "$1" ]; do
-    echo "ui_print $1
+    echo -e "ui_print $1
       ui_print" >> /proc/self/fd/$OUTFD;
     shift;
   done;
@@ -29,7 +29,7 @@ abort() {
 
 # contains <string> <substring>
 contains() {
-  [ "${1#*$2}" != "$1" ];
+  test "${1#*$2}" != "$1";
 }
 
 # file_getprop <file> <property>
@@ -81,7 +81,7 @@ split_boot() {
   else
     dd if=$block of=$bootimg $customdd;
   fi;
-  [ $? != 0 ] && dumpfail=1;
+  test $? != 0 && dumpfail=1;
 
   mkdir -p $split_img;
   cd $split_img;
@@ -91,9 +91,9 @@ split_boot() {
       $bin/elftool unpack -i $bootimg -o elftool_out;
     fi;
     $bin/unpackelf -i $bootimg;
-    [ $? != 0 ] && dumpfail=1;
-    mv -f boot.img-kernel kernel.gz;
-    mv -f boot.img-ramdisk ramdisk.cpio.gz;
+    test $? != 0 && dumpfail=1;
+    mv -f boot.img-zImage kernel.gz;
+    mv -f boot.img-ramdisk.cpio.gz ramdisk.cpio.gz;
     mv -f boot.img-cmdline cmdline.txt 2>/dev/null;
     if [ -f boot.img-dt -a ! -f "$bin/elftool" ]; then
       case $(od -ta -An -N4 boot.img-dt | sed -e 's/ del//' -e 's/   //g') in
@@ -118,7 +118,7 @@ split_boot() {
     grep "Address:" header | cut -c15- > boot.img-addr;
     grep "Point:" header | cut -c15- > boot.img-ep;
     $bin/dumpimage -p 0 -o kernel.gz boot-trimmed.img;
-    [ $? != 0 ] && dumpfail=1;
+    test $? != 0 && dumpfail=1;
     case $(cat boot.img-type) in
       Multi) $bin/dumpimage -p 1 -o ramdisk.cpio.gz boot-trimmed.img;;
       RAMDisk) mv -f kernel.gz ramdisk.cpio.gz;;
@@ -166,14 +166,14 @@ unpack_ramdisk() {
     fi;
   fi;
 
-  [ -d $ramdisk ] && mv -f $ramdisk $home/rdtmp;
+  test -d $ramdisk && mv -f $ramdisk $home/rdtmp;
   mkdir -p $ramdisk;
   chmod 755 $ramdisk;
 
   cd $ramdisk;
   EXTRACT_UNSAFE_SYMLINKS=1 cpio -d -F $split_img/ramdisk.cpio -i;
   if [ $? != 0 -o ! "$(ls)" ]; then
-    echo "Unpacking ramdisk failed.";
+    abort "Unpacking ramdisk failed. Aborting...";
   fi;
   if [ -d "$home/rdtmp" ]; then
     cp -af $home/rdtmp/* .;
@@ -182,7 +182,6 @@ unpack_ramdisk() {
 ### dump_boot (dump and split image, then extract ramdisk)
 dump_boot() {
   split_boot;
-  [ -f "$split_img/ramdisk.cpio.gz" -o -f "$split_img/ramdisk.cpio" ] && unpack_ramdisk;
 }
 ###
 
@@ -208,23 +207,23 @@ repack_ramdisk() {
     cd $ramdisk;
     find . | cpio -H newc -o > $home/ramdisk-new.cpio;
   fi;
-  [ $? != 0 ] && packfail=1;
+  test $? != 0 && packfail=1;
 
   cd $home;
   $bin/magiskboot cpio ramdisk-new.cpio test;
   magisk_patched=$?;
-  [ $((magisk_patched & 3)) -eq 1 ] && $bin/magiskboot cpio ramdisk-new.cpio "extract .backup/.magisk $split_img/.magisk";
+  test $((magisk_patched & 3)) -eq 1 && $bin/magiskboot cpio ramdisk-new.cpio "extract .backup/.magisk $split_img/.magisk";
   if [ "$comp" ]; then
     $bin/magiskboot compress=$comp ramdisk-new.cpio;
     if [ $? != 0 ]; then
       echo "Attempting ramdisk repack with busybox $comp..." >&2;
       $comp -9c ramdisk-new.cpio > ramdisk-new.cpio.$comp;
-      [ $? != 0 ] && packfail=1;
+      test $? != 0 && packfail=1;
       rm -f ramdisk-new.cpio;
     fi;
   fi;
   if [ "$packfail" ]; then
-    echo "Repacking ramdisk failed.";
+    abort "Repacking ramdisk failed. Aborting...";
   fi;
 
   if [ -f "$bin/mkmtkhdr" -a -f "$split_img/boot.img-base" ]; then
@@ -244,7 +243,7 @@ flash_boot() {
     varlist="name arch os type comp addr ep";
   elif [ -f "$bin/mkbootimg" -a -f "$bin/unpackelf" -a -f boot.img-base ]; then
     mv -f cmdline.txt boot.img-cmdline 2>/dev/null;
-    varlist="cmdline base pagesize kernel_offset ramdisk_offset tags_offset";
+    varlist="cmdline base pagesize kerneloff ramdiskoff tagsoff";
   fi;
   for i in $varlist; do
     if [ -f boot.img-$i ]; then
@@ -285,7 +284,7 @@ flash_boot() {
 
   cd $split_img;
   if [ -f "$bin/mkimage" ]; then
-    [ "$comp" == "uncompressed" ] && comp=none;
+    test "$comp" == "uncompressed" && comp=none;
     part0=$kernel;
     case $type in
       Multi) part1=":$ramdisk";;
@@ -293,8 +292,8 @@ flash_boot() {
     esac;
     $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d $part0$part1 $home/boot-new.img;
   elif [ -f "$bin/elftool" ]; then
-    [ "$dt" ] && dt="$dt,rpm";
-    [ -f cmdline.txt ] && cmdline="cmdline.txt@cmdline";
+    test "$dt" && dt="$dt,rpm";
+    test -f cmdline.txt && cmdline="cmdline.txt@cmdline";
     $bin/elftool pack -o $home/boot-new.img header=elftool_out/header $kernel $ramdisk,ramdisk $dt $cmdline;
   elif [ -f "$bin/mboot" ]; then
     cp -f $kernel kernel;
@@ -303,14 +302,14 @@ flash_boot() {
   elif [ -f "$bin/rkcrc" ]; then
     $bin/rkcrc -k $ramdisk $home/boot-new.img;
   elif [ -f "$bin/mkbootimg" -a -f "$bin/unpackelf" -a -f boot.img-base ]; then
-    [ "$dt" ] && dt="--dt $dt";
-    $bin/mkbootimg --kernel $kernel --ramdisk $ramdisk --cmdline "$cmdline" --base $base --pagesize $pagesize --kernel_offset $kernel_offset --ramdisk_offset $ramdisk_offset --tags_offset "$tags_offset" $dt --output $home/boot-new.img;
+    test "$dt" && dt="--dt $dt";
+    $bin/mkbootimg --kernel $kernel --ramdisk $ramdisk --cmdline "$cmdline" --base $home --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --tags_offset "$tagsoff" $dt --output $home/boot-new.img;
   else
-    [ "$kernel" ] && cp -f $kernel kernel;
-    [ "$ramdisk" ] && cp -f $ramdisk ramdisk.cpio;
-    [ "$dt" -a -f extra ] && cp -f $dt extra;
+    test "$kernel" && cp -f $kernel kernel;
+    test "$ramdisk" && cp -f $ramdisk ramdisk.cpio;
+    test "$dt" -a -f extra && cp -f $dt extra;
     for i in dtb recovery_dtbo; do
-      [ "$(eval echo \$$i)" -a -f $i ] && cp -f $(eval echo \$$i) $i;
+      test "$(eval echo \$$i)" -a -f $i && cp -f $(eval echo \$$i) $i;
     done;
     case $kernel in
       *Image*)
@@ -338,11 +337,11 @@ flash_boot() {
             fi;
             mv -f kernel.$comp kernel;
           fi;
-          [ ! -f .magisk ] && $bin/magiskboot cpio ramdisk.cpio "extract .backup/.magisk .magisk";
+          test ! -f .magisk && $bin/magiskboot cpio ramdisk.cpio "extract .backup/.magisk .magisk";
           export $(cat .magisk);
-          [ $((magisk_patched & 8)) -ne 0 ] && export TWOSTAGEINIT=true;
+          test $((magisk_patched & 8)) -ne 0 && export TWOSTAGEINIT=true;
           for fdt in dtb extra kernel_dtb recovery_dtbo; do
-            [ -f $fdt ] && $bin/magiskboot dtb $fdt patch;
+            test -f $fdt && $bin/magiskboot dtb $fdt patch;
           done;
         else
           case $kernel in
@@ -360,7 +359,6 @@ flash_boot() {
   if [ $? != 0 ]; then
     abort "Repacking image failed. Aborting...";
   fi;
-  [ -f .magisk ] && touch $home/magisk_patched;
 
   cd $home;
   if [ -f "$bin/futility" -a -d "$bin/chromeos" ]; then
@@ -368,18 +366,18 @@ flash_boot() {
       echo "Signing with CHROMEOS..." >&2;
       $bin/futility vbutil_kernel --pack boot-new-signed.img --keyblock $bin/chromeos/kernel.keyblock --signprivate $bin/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz boot-new.img --bootloader $bin/chromeos/empty --config $bin/chromeos/empty --arch arm --flags 0x1;
     fi;
-    [ $? != 0 ] && signfail=1;
+    test $? != 0 && signfail=1;
   fi;
-  if [ -f "$bin/boot_signer-dexed.jar" -a -d "$bin/avb" ]; then
+  if [ -f "$bin/BootSignature_Android.jar" -a -d "$bin/avb" ]; then
     pk8=$(ls $bin/avb/*.pk8);
     cert=$(ls $bin/avb/*.x509.*);
     case $block in
       *recovery*|*SOS*) avbtype=recovery;;
       *) avbtype=boot;;
     esac;
-    if [ "$(/system/bin/dalvikvm -Xnoimage-dex2oat -cp $bin/boot_signer-dexed.jar com.android.verity.BootSignature -verify boot.img 2>&1 | grep VALID)" ]; then
+    if [ "$(/system/bin/dalvikvm -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature -verify boot.img 2>&1 | grep VALID)" ]; then
       echo "Signing with AVBv1..." >&2;
-      /system/bin/dalvikvm -Xnoimage-dex2oat -cp $bin/boot_signer-dexed.jar com.android.verity.BootSignature /$avbtype boot-new.img $pk8 $cert boot-new-signed.img;
+      /system/bin/dalvikvm -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype boot-new.img $pk8 $cert boot-new-signed.img;
     fi;
   fi;
   if [ $? != 0 -o "$signfail" ]; then
@@ -392,7 +390,6 @@ flash_boot() {
   elif [ "$(wc -c < boot-new.img)" -gt "$(wc -c < boot.img)" ]; then
     abort "New image larger than boot partition. Aborting...";
   fi;
-  blockdev --setrw $block 2>/dev/null;
   if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
     $bin/flash_erase $block 0 0;
     $bin/nandwrite -p $block boot-new.img;
@@ -419,13 +416,11 @@ flash_dtbo() {
     fi;
   done;
 
-  if [ "$dtbo" -a ! -f dtbo_flashed ]; then
+  if [ "$dtbo" ]; then
     dtboblock=/dev/block/bootdevice/by-name/dtbo$slot;
     if [ ! -e "$dtboblock" ]; then
       abort "dtbo partition could not be found. Aborting...";
     fi;
-    blockdev --setrw $dtboblock 2>/dev/null;
-    ui_print " " "$dtboblock";
     if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
       $bin/flash_erase $dtboblock 0 0;
       $bin/nandwrite -p $dtboblock $dtbo;
@@ -438,12 +433,10 @@ flash_dtbo() {
     if [ $? != 0 ]; then
       abort "Flashing dtbo failed. Aborting...";
     fi;
-    touch dtbo_flashed;
   fi;
 }
 ### write_boot (repack ramdisk then build, sign and write image and dtbo)
 write_boot() {
-  [ -d "$ramdisk" ] && repack_ramdisk;
   flash_boot;
   flash_dtbo;
 }
@@ -451,14 +444,14 @@ write_boot() {
 
 ### file editing functions:
 # backup_file <file>
-backup_file() { [ ! -f $1~ ] && cp -fp $1 $1~; }
+backup_file() { test ! -f $1~ && cp -fp $1 $1~; }
 
 # restore_file <file>
-restore_file() { [ -f $1~ ] && cp -fp $1~ $1; rm -f $1~; }
+restore_file() { test -f $1~ && cp -fp $1~ $1; rm -f $1~; }
 
 # replace_string <file> <if search string> <original string> <replacement string> <scope>
 replace_string() {
-  [ "$5" == "global" ] && local scope=g;
+  test "$5" == "global" && local scope=g;
   if ! grep -q "$2" $1; then
     sed -i "s;${3};${4};${scope}" $1;
   fi;
@@ -478,7 +471,7 @@ replace_section() {
     for end in $(grep -n "$endstr" $1 | cut -d: -f1) $last; do
       if [ "$end" ] && [ "$begin" -lt "$end" ]; then
         sed -i "${begin},${end}d" $1;
-        [ "$end" == "$last" ] && echo >> $1;
+        test "$end" == "$last" && echo >> $1;
         sed -i "${begin}s;^;${4}\n;" $1;
         break;
       fi;
@@ -523,27 +516,19 @@ insert_line() {
   fi;
 }
 
-# replace_line <file> <line replace string> <replacement line> <scope>
+# replace_line <file> <line replace string> <replacement line>
 replace_line() {
-  local lines line;
   if grep -q "$2" $1; then
-    lines=$(grep -n "$2" $1 | cut -d: -f1 | sort -nr);
-    [ "$4" == "global" ] || lines=$(echo "$lines" | tail -n1);
-    for line in $lines; do
-      sed -i "${line}s;.*;${3};" $1;
-    done;
+    local line=$(grep -n "$2" $1 | head -n1 | cut -d: -f1);
+    sed -i "${line}s;.*;${3};" $1;
   fi;
 }
 
-# remove_line <file> <line match string> <scope>
+# remove_line <file> <line match string>
 remove_line() {
-  local lines line;
   if grep -q "$2" $1; then
-    lines=$(grep -n "$2" $1 | cut -d: -f1 | sort -nr);
-    [ "$3" == "global" ] || lines=$(echo "$lines" | tail -n1);
-    for line in $lines; do
-      sed -i "${line}d" $1;
-    done;
+    local line=$(grep -n "$2" $1 | head -n1 | cut -d: -f1);
+    sed -i "${line}d" $1;
   fi;
 }
 
@@ -657,23 +642,18 @@ reset_ak() {
 
   current=$(dirname $home/*-files/current);
   if [ -d "$current" ]; then
-    for i in $bootimg $home/boot-new.img; do
-      [ -e $i ] && cp -af $i $current;
-    done;
-    for i in $current/*; do
-      [ -f $i ] && rm -f $home/$(basename $i);
+    rm -rf $current/ramdisk;
+    for i in $bootimg boot-new.img; do
+      test -e $i && cp -af $i $current;
     done;
   fi;
-  [ -d $split_img ] && rm -rf $ramdisk;
+  test -d $split_img && rm -rf $ramdisk;
   rm -rf $bootimg $split_img $home/*-new* $home/*-files/current;
 
   if [ "$1" == "keep" ]; then
-    [ -d $home/rdtmp ] && mv -f $home/rdtmp $ramdisk;
+    test -d $home/rdtmp && mv -f $home/rdtmp $ramdisk;
   else
     rm -rf $patch $home/rdtmp;
-  fi;
-  if [ ! "$no_block_display" ]; then
-    ui_print " ";
   fi;
   setup_ak;
 }
@@ -682,15 +662,26 @@ reset_ak() {
 setup_ak() {
   local blockfiles parttype name part mtdmount mtdpart mtdname target;
 
+  # allow multi-partition ramdisk modifying configurations (using reset_ak)
+  if [ "$block" ] && [ ! -d "$ramdisk" -a ! -d "$patch" ]; then
+    blockfiles=$home/$(basename $block)-files;
+    if [ "$(ls $blockfiles 2>/dev/null)" ]; then
+      cp -af $blockfiles/* $home;
+    else
+      mkdir -p $blockfiles;
+    fi;
+    touch $blockfiles/current;
+  fi;
+
   # slot detection enabled by is_slot_device=1 or auto (from anykernel.sh)
   case $is_slot_device in
     1|auto)
       slot=$(getprop ro.boot.slot_suffix 2>/dev/null);
-      [ "$slot" ] || slot=$(grep -o 'androidboot.slot_suffix=.*$' /proc/cmdline | cut -d\  -f1 | cut -d= -f2);
+      test "$slot" || slot=$(grep -o 'androidboot.slot_suffix=.*$' /proc/cmdline | cut -d\  -f1 | cut -d= -f2);
       if [ ! "$slot" ]; then
         slot=$(getprop ro.boot.slot 2>/dev/null);
-        [ "$slot" ] || slot=$(grep -o 'androidboot.slot=.*$' /proc/cmdline | cut -d\  -f1 | cut -d= -f2);
-        [ "$slot" ] && slot=_$slot;
+        test "$slot" || slot=$(grep -o 'androidboot.slot=.*$' /proc/cmdline | cut -d\  -f1 | cut -d= -f2);
+        test "$slot" && slot=_$slot;
       fi;
       if [ "$slot" ]; then
         if [ -d /postinstall/tmp -a ! "$slot_select" ]; then
@@ -706,45 +697,20 @@ setup_ak() {
         esac;
       fi;
       if [ ! "$slot" -a "$is_slot_device" == 1 ]; then
-        abort "Unable to determine active slot. Aborting...";
+        abort "Unable to determine active boot slot. Aborting...";
       fi;
     ;;
   esac;
-
-  # automate simple multi-partition setup for boot_img_hdr_v3 + vendor_boot
-  cd $home;
-  if [ -e "/dev/block/bootdevice/by-name/vendor_boot$slot" -a ! -f vendor_setup ] && [ -f dtb -o -d vendor_ramdisk -o -d vendor_patch ]; then
-    echo "Setting up for simple automatic vendor_boot flashing..." >&2;
-    (mkdir boot-files;
-    mv -f Image* ramdisk patch boot-files;
-    mkdir vendor_boot-files;
-    mv -f dtb vendor_boot-files;
-    mv -f vendor_ramdisk vendor_boot-files/ramdisk;
-    mv -f vendor_patch vendor_boot-files/patch) 2>/dev/null;
-    touch vendor_setup;
-  fi;
-
-  # allow multi-partition ramdisk modifying configurations (using reset_ak)
-  if [ "$block" ] && [ ! -d "$ramdisk" -a ! -d "$patch" ]; then
-    blockfiles=$home/$(basename $block)-files;
-    if [ "$(ls $blockfiles 2>/dev/null)" ]; then
-      cp -af $blockfiles/* $home;
-    else
-      mkdir $blockfiles;
-    fi;
-    touch $blockfiles/current;
-  fi;
 
   # target block partition detection enabled by block=boot recovery or auto (from anykernel.sh)
   case $block in
      auto|"") block=boot;;
   esac;
   case $block in
-    boot|recovery|vendor_boot)
+    boot|recovery)
       case $block in
         boot) parttype="ramdisk boot BOOT LNX android_boot bootimg KERN-A kernel KERNEL";;
         recovery) parttype="ramdisk_recovery recovery RECOVERY SOS android_recovery";;
-        vendor_boot) parttype="vendor_boot";;
       esac;
       for name in $parttype; do
         for part in $name$slot $name; do
@@ -770,7 +736,7 @@ setup_ak() {
           elif [ -e /dev/$part ]; then
             target=/dev/$part;
           fi;
-          [ "$target" ] && break 2;
+          test "$target" && break 2;
         done;
       done;
       if [ "$target" ]; then
@@ -781,13 +747,10 @@ setup_ak() {
     ;;
     *)
       if [ "$slot" ]; then
-        [ -e "$block$slot" ] && block=$block$slot;
+        test -e "$block$slot" && block=$block$slot;
       fi;
     ;;
   esac;
-  if [ ! "$no_block_display" ]; then
-    ui_print "$block";
-  fi;
 }
 ###
 
