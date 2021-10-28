@@ -1,8 +1,8 @@
-NAME ?= DragonFire-Kernel
+NAME ?= Dragonfire-Kernel
 
 DATE := $(shell date "+%Y%m%d-%H%M")
 
-CODE := olives
+CODE := lime
 
 ZIP := $(NAME)-$(CODE)-$(DATE).zip
 

@@ -4,16 +4,15 @@
 ## AnyKernel setup
 # begin properties
 properties() { '
-kernel.string=DragonFire Kernel by Jaxer159
+kernel.string=Dragonfire Kernel by Jaxer159
 do.devicecheck=1
 do.modules=1
 do.systemless=0
 do.cleanup=1
 do.cleanuponabort=0
-device.name1=olive
-device.name2=olivelite
-device.name3=olivewood
-device.name4=olives
+device.name1=juice
+device.name2=lime
+device.name3=lemon
 supported.versions=
 supported.patchlevels=
 '; } # end properties
