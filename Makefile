@@ -1,10 +1,10 @@
-NAME ?= Dragonfire-Kernel
+NAME ?= Dragonfire
 
-DATE := $(shell date "+%Y%m%d-%H%M")
+VER := 1.0
 
 CODE := lime
 
-ZIP := $(NAME)-$(CODE)-$(DATE).zip
+ZIP := $(NAME)-$(CODE)-$(VER).zip
 
 EXCLUDE := Makefile *.git* *.jar* *placeholder* *.md*
 
