@@ -4,47 +4,27 @@
 ## AnyKernel setup
 # begin properties
 properties() { '
-kernel.string=Dragonfire Kernel by Jaxer159
-do.devicecheck=1
-do.modules=1
-do.systemless=0
+kernel.string=Dragonfire Kernel
+maintainer.string=Jaxer159
+do.devicecheck=0
+do.modules=0
+do.systemless=1
 do.cleanup=1
 do.cleanuponabort=0
-device.name1=juice
-device.name2=lime
-device.name3=lemon
-supported.versions=
-supported.patchlevels=
-'; } # end properties
+'; }
 
 # shell variables
 block=/dev/block/bootdevice/by-name/boot;
 is_slot_device=0;
 ramdisk_compression=auto;
 
-
 ## AnyKernel methods (DO NOT CHANGE)
 # import patching functions/variables - see for reference
 . tools/ak3-core.sh;
 
-set_con() {
-  chcon -h u:object_r:"$1":s0 $2
-  chcon u:object_r:"$1":s0 $2
-}
-
-# AnyKernel install
+## AnyKernel install
 dump_boot;
-
-umount /vendor || true
-mount -o rw /dev/block/bootdevice/by-name/vendor /vendor
-cp -fr /tmp/anykernel/ramdisk/init.qcom.test.rc /vendor/etc/init/hw/init.qcom.test.rc
-chmod 644 /vendor/etc/init/hw/init.qcom.test.rc
-chown root.root /vendor/etc/init/hw/init.qcom.test.rc
-set_con vendor_configs_file /vendor/etc/init/hw/init.qcom.test.rc
-rm -rf /vendor/lib/modules/audio_*
-rm -rf /vendor/lib/modules/exfat.ko
 
 write_boot;
 ## end install
-
 

@@ -20,10 +20,10 @@ $(ZIP):
 
 
 clean:
+	@rm -vf dtbo.img
 	@rm -vf *.zip*
 	@rm -vf zImage
-	@rm -vf modules/system/lib/modules/*.ko
-	@rm -vf modules/system/lib/modules/pronto/*.ko
+	@rm -vf Image*
 	@echo "Done."
 
 
