@@ -1,6 +1,6 @@
 NAME ?= Dragonfire
 
-VER := 1.0
+VER := 2.0
 
 CODE := lime
 
